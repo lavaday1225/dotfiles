@@ -44,6 +44,8 @@ path=(
 )
 export PATH
 
+export PATH=$PATH:~/bin
+
 # Compiler Flags
 export LDFLAGS="-L/opt/homebrew/opt/icu4c/lib -L/opt/homebrew/opt/gdal/lib"
 export CPPFLAGS="-I/opt/homebrew/opt/icu4c/include -I/opt/homebrew/opt/gdal/include"
@@ -78,6 +80,39 @@ fcd() {
   dir=$(find ${1:-.} -type d -not -path '*/\.*' 2> /dev/null | fzf +m) && cd "$dir"
 }
 
+# lazygit
+alias lg='lazygit'
+
+# ghq
+# Custom ghq function to auto-expand MobilityTechnologies repo
+ghqc() {
+  ghq clone "https://github.com/MobilityTechnologies/$1.git"
+}
+
+# Function to sync AWS SSO credentials into the lbox environment
+lboxstart() {
+    local PROFILE="mot-sandbox-software-dev-aws_llm-trial-emp-ro"
+    local CRED_FILE="$HOME/.llm-aws-credentials"
+
+    echo "🔑 [lbox] Initiating AWS SSO Login..."
+    aws sso login --profile "$PROFILE"
+
+    # Check if login was successful before proceeding
+    if [ $? -eq 0 ]; then
+        echo "📤 [lbox] Exporting credentials to $CRED_FILE"
+        aws configure export-credentials --profile "$PROFILE" --format env-no-export > "$CRED_FILE"
+        
+        echo "🔄 [lbox] Updating container environment..."
+        lbox update-env
+        
+        echo "🚀 [lbox] Entering sandbox..."
+        lbox
+    else
+        echo "❌ [lbox] Login failed. Sequence aborted."
+        return 1
+    fi
+}
+
 # ==========================================
 # 7. Final Theming
 # ==========================================
@@ -89,3 +124,24 @@ if [ -d ~/.local/share/bash-completion/completions ]; then
     [ -r "$completion" ] && . "$completion"
   done
 fi
+eval "$(mise activate zsh)"
+
+# The next line updates PATH for the Google Cloud SDK.
+if [ -f '/Users/syuanwei.kuo/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/syuanwei.kuo/google-cloud-sdk/path.zsh.inc'; fi
+
+# The next line enables shell command completion for gcloud.
+if [ -f '/Users/syuanwei.kuo/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/syuanwei.kuo/google-cloud-sdk/completion.zsh.inc'; fi
+export PATH="/opt/homebrew/opt/mysql@8.0/bin:$PATH"
+
+# ghq
+function ghq-fzf() {
+  local src=$(ghq list | fzf --preview "bat --color=always --style=header,grid --line-range :80 $(ghq root)/{}/README.*")
+  if [ -n "$src" ]; then
+    BUFFER="cd $(ghq root)/$src"
+    zle accept-line
+  fi
+  zle -R -c
+}
+zle -N ghq-fzf
+bindkey '^g' ghq-fzf
+
